@@ -6,7 +6,19 @@
   const BUTTON_ID = 'cgt-ext-search-button';
   const FALLBACK_TIMEOUT_MS = 10000;
 
+  // Product pages live at /3d-models/<slug> or /<locale>/3d-models/<slug>
+  // (e.g. /es/3d-models/..., /zh-cn/3d-models/...). The manifest match
+  // pattern is broader than this, so guard here.
+  const PRODUCT_PATH_RE = /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?3d-models\/.+/i;
+  if (!PRODUCT_PATH_RE.test(window.location.pathname)) return;
+
   function findAddToCartButton() {
+    // Locale-independent: the buy-box button carries a stable test id
+    // regardless of UI language (e.g. "Añadir a la Cesta" on /es/ pages).
+    const byTestId = document.querySelector('button[data-testid="add-cart-button"]');
+    if (byTestId) return byTestId;
+
+    // Fallback: English text match.
     const buttons = document.querySelectorAll('button');
     for (const button of buttons) {
       if (/add to cart/i.test(button.textContent || '')) return button;

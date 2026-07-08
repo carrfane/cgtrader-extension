@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CGTrader Visual Search for TurboSquid",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Adds a 'Search on CGTrader' button to TurboSquid product pages to find visually similar 3D models on CGTrader.",
   "icons": {
     "16": "icons/icon16.png",
@@ -18,7 +18,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.turbosquid.com/3d-models/*"],
+      "matches": [
+        "https://www.turbosquid.com/3d-models/*",
+        "https://www.turbosquid.com/*/3d-models/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
