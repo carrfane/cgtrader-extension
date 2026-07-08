@@ -1,0 +1,58 @@
+.cgt-ext-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: #24b284;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cgt-ext-button:hover:not(:disabled) {
+  background-color: #1e9770;
+}
+
+.cgt-ext-button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.cgt-ext-button--floating {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483647;
+  width: auto;
+  margin-top: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.cgt-ext-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: cgt-ext-spin 0.8s linear infinite;
+}
+
+@keyframes cgt-ext-spin {
+  to { transform: rotate(360deg); }
+}
+
+.cgt-ext-error {
+  margin-top: 6px;
+  color: #d93025;
+  font-size: 12px;
+  font-family: inherit;
+}
