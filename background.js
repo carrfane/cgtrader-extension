@@ -103,6 +103,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 const MENU_ID = 'cgtrader-image-search';
 
+function isCgtraderUrl(url) {
+  try {
+    return /(^|\.)cgtrader\.com$/i.test(new URL(url).hostname);
+  } catch (_) {
+    return false;
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: MENU_ID,
@@ -112,9 +120,10 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === MENU_ID && info.srcUrl) {
-    searchOnCgtrader(info.srcUrl).catch((error) => {
-      console.error(`${LOG_PREFIX} context menu search failed:`, error);
-    });
-  }
+  if (info.menuItemId !== MENU_ID || !info.srcUrl) return;
+  // No point searching CGTrader from a CGTrader page.
+  if (isCgtraderUrl(info.pageUrl)) return;
+  searchOnCgtrader(info.srcUrl).catch((error) => {
+    console.error(`${LOG_PREFIX} context menu search failed:`, error);
+  });
 });

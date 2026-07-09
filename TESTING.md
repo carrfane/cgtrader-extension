@@ -31,9 +31,16 @@ Load the extension: `chrome://extensions` → enable Developer mode →
    - [ ] The context menu item still works (this is where the menu beats the
          hover overlay).
 
+## CGTrader is excluded
+
+7. Open any CGTrader page (e.g. https://www.cgtrader.com/3d-models).
+   - [ ] Hovering images shows NO overlay button.
+   - [ ] Right-clicking an image shows NO "Search image on CGTrader" menu item.
+
 ## Error handling
 
-7. In DevTools → Network, block `www.cgtrader.com`, then click the hover button.
+8. On a non-CGTrader page, in DevTools → Network block `www.cgtrader.com`,
+   then click the hover button.
    - [ ] The button briefly turns red with "Something went wrong", then reverts.
 
 ## Session reuse
