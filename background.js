@@ -98,3 +98,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   return false;
 });
+
+// --- Right-click context menu on images (covers iframes and overlay blind spots) ---
+
+const MENU_ID = 'cgtrader-image-search';
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: MENU_ID,
+    title: 'Search image on CGTrader',
+    contexts: ['image'],
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === MENU_ID && info.srcUrl) {
+    searchOnCgtrader(info.srcUrl).catch((error) => {
+      console.error(`${LOG_PREFIX} context menu search failed:`, error);
+    });
+  }
+});
