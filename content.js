@@ -90,28 +90,58 @@
     return true;
   }
 
-  // --- Hover wiring (delegated) ---
-
-  document.addEventListener('mouseover', (event) => {
-    const target = event.target;
-
-    // Moving onto the overlay itself: keep it visible.
-    if (target === host) return;
-
-    clearTimeout(STATE.hoverTimer);
-
-    if (target instanceof HTMLImageElement && isEligible(target)) {
-      STATE.hoverTimer = setTimeout(() => {
-        if (STATE.searching) return;
-        STATE.currentImg = target;
-        setButtonLabel('Search on CGTrader');
-        button.classList.remove('error');
-        showOverlayFor(target);
-      }, HOVER_DELAY_MS);
-    } else if (!STATE.searching) {
-      hideOverlay();
+  // Find the topmost eligible <img> under the cursor. Using the element
+  // stack (not event.target) means we also detect images that sites cover
+  // with transparent click-capturing overlays, e.g. Instagram carousels.
+  function eligibleImageAt(x, y) {
+    const stack = document.elementsFromPoint(x, y);
+    for (const el of stack) {
+      if (el === host) continue; // never treat our own overlay as a target
+      if (el instanceof HTMLImageElement && isEligible(el)) return el;
+      // Stop descending once we hit our overlay host to avoid odd cases.
     }
-  }, true);
+    return null;
+  }
+
+  // --- Hover wiring (pointer-position based, throttled) ---
+
+  let rafPending = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  function onPointerMove(event) {
+    lastX = event.clientX;
+    lastY = event.clientY;
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      if (STATE.searching) return;
+
+      const img = eligibleImageAt(lastX, lastY);
+
+      if (img) {
+        // Same image already shown: just keep it (and refresh position).
+        if (img === STATE.currentImg && host.style.display !== 'none') {
+          showOverlayFor(img);
+          return;
+        }
+        clearTimeout(STATE.hoverTimer);
+        STATE.hoverTimer = setTimeout(() => {
+          if (STATE.searching) return;
+          STATE.currentImg = img;
+          setButtonLabel('Search on CGTrader');
+          button.classList.remove('error');
+          showOverlayFor(img);
+        }, HOVER_DELAY_MS);
+      } else {
+        clearTimeout(STATE.hoverTimer);
+        hideOverlay();
+      }
+    });
+  }
+
+  document.addEventListener('mousemove', onPointerMove, true);
 
   window.addEventListener('scroll', hideOverlay, true);
   window.addEventListener('resize', hideOverlay);

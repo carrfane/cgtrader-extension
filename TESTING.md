@@ -17,6 +17,13 @@ Load the extension: `chrome://extensions` → enable Developer mode →
          button did NOT navigate.
 3. Try several different sites (a news site, a shop, an image gallery).
    - [ ] The overlay appears and search works across sites.
+3b. Try sites that cover images with click-capturing overlays:
+   - Instagram post, e.g. https://www.instagram.com/p/DUa3amLEsRS/
+   - A results grid, e.g. https://www.turbosquid.com/es/Search/3D-Models/mammals
+   - [ ] Hovering the image still shows the button (detected via the
+         element under the cursor, not just the direct hover target).
+   - [ ] Clicking searches and does NOT trigger the site's own
+         click/carousel behavior.
 4. Try a TurboSquid product page (both work the same as any other site):
    - https://www.turbosquid.com/3d-models/2023-porsche-911-gt3-rs-yellow-2087437
    - https://www.turbosquid.com/es/3d-models/2023-porsche-911-gt3-rs-yellow-2087437

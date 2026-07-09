@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CGTrader Visual Search",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Hover any image on the web and search for visually similar 3D models on CGTrader.",
   "icons": {
     "16": "icons/icon16.png",
