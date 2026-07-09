@@ -1,85 +1,132 @@
-// content.js - runs on TurboSquid product pages.
-// Injects a "Search on CGTrader" button and delegates the search to the background worker.
+// content.js - runs on all pages.
+// Shows a "Search on CGTrader" overlay button when hovering large images.
 
 (() => {
   const LOG_PREFIX = '[cgtrader-ext]';
-  const BUTTON_ID = 'cgt-ext-search-button';
-  const FALLBACK_TIMEOUT_MS = 10000;
+  const MIN_IMAGE_SIZE = 120; // px, rendered shorter side
+  const HOVER_DELAY_MS = 150;
+  const ERROR_REVERT_MS = 3000;
 
-  // Product pages live at /3d-models/<slug> or /<locale>/3d-models/<slug>
-  // (e.g. /es/3d-models/..., /zh-cn/3d-models/...). The manifest match
-  // pattern is broader than this, so guard here.
-  const PRODUCT_PATH_RE = /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?3d-models\/.+/i;
-  if (!PRODUCT_PATH_RE.test(window.location.pathname)) return;
+  const STATE = {
+    currentImg: null,
+    hoverTimer: null,
+    searching: false,
+  };
 
-  function findAddToCartButton() {
-    // Locale-independent: the buy-box button carries a stable test id
-    // regardless of UI language (e.g. "Añadir a la Cesta" on /es/ pages).
-    const byTestId = document.querySelector('button[data-testid="add-cart-button"]');
-    if (byTestId) return byTestId;
+  // --- Overlay (single reusable button in a closed shadow root) ---
 
-    // Fallback: English text match.
-    const buttons = document.querySelectorAll('button');
-    for (const button of buttons) {
-      if (/add to cart/i.test(button.textContent || '')) return button;
-    }
-    return null;
-  }
-
-  function findProductImageUrl() {
-    // Prefer the currently displayed carousel image: largest visible <img>
-    // hosted on p.turbosquid.com.
-    let best = null;
-    let bestArea = 0;
-    for (const img of document.querySelectorAll('img')) {
-      const src = img.currentSrc || img.src || '';
-      if (!src.startsWith('https://p.turbosquid.com/')) continue;
-      const rect = img.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) continue; // not visible
-      const area = rect.width * rect.height;
-      if (area > bestArea) {
-        bestArea = area;
-        best = src;
+  const host = document.createElement('div');
+  host.style.cssText = 'all: initial; position: fixed; z-index: 2147483647; display: none;';
+  const shadow = host.attachShadow({ mode: 'closed' });
+  shadow.innerHTML = `
+    <style>
+      button {
+        all: initial;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 12px;
+        border-radius: 6px;
+        background-color: #24b284;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        white-space: nowrap;
       }
-    }
-    if (best) return best;
+      button:hover { background-color: #1e9770; }
+      button.error { background-color: #d93025; cursor: default; }
+      .spinner {
+        width: 11px;
+        height: 11px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+    <button type="button">Search on CGTrader</button>
+  `;
+  const button = shadow.querySelector('button');
 
-    const og = document.querySelector('meta[property="og:image"]');
-    return og && og.content ? og.content : null;
+  function setButtonLabel(html) {
+    button.innerHTML = html;
   }
 
-  function setLoading(button, isLoading) {
-    button.disabled = isLoading;
-    button.innerHTML = '';
-    if (isLoading) {
-      const spinner = document.createElement('span');
-      spinner.className = 'cgt-ext-spinner';
-      button.appendChild(spinner);
-      button.appendChild(document.createTextNode('Searching\u2026'));
-    } else {
-      button.appendChild(document.createTextNode('Search on CGTrader'));
-    }
+  function showOverlayFor(img) {
+    const rect = img.getBoundingClientRect();
+    host.style.display = 'block';
+    // Measure after display so offsetWidth is real.
+    const top = Math.max(rect.top + 8, 8);
+    const right = Math.min(rect.right - 8, window.innerWidth - 8);
+    host.style.top = `${top}px`;
+    host.style.left = `${Math.max(right - host.offsetWidth, 8)}px`;
   }
 
-  function showError(button, text) {
-    const existing = button.parentElement.querySelector('.cgt-ext-error');
-    if (existing) existing.remove();
-    const error = document.createElement('div');
-    error.className = 'cgt-ext-error';
-    error.textContent = text;
-    button.insertAdjacentElement('afterend', error);
-    setTimeout(() => error.remove(), 5000);
+  function hideOverlay() {
+    if (STATE.searching) return; // keep visible while a search runs
+    host.style.display = 'none';
+    STATE.currentImg = null;
   }
 
-  async function handleClick(event) {
-    const button = event.currentTarget;
-    const imageUrl = findProductImageUrl();
-    if (!imageUrl) {
-      showError(button, 'No product image found on this page.');
-      return;
-    }
+  // --- Image eligibility ---
 
-    setLoading(button, true);
+  function imageUrlOf(img) {
+    return img.currentSrc || img.src || '';
+  }
+
+  function isEligible(img) {
+    if (!(img instanceof HTMLImageElement)) return false;
+    const url = imageUrlOf(img);
+    if (!/^(https?:|data:)/i.test(url)) return false;
+    const rect = img.getBoundingClientRect();
+    if (Math.min(rect.width, rect.height) < MIN_IMAGE_SIZE) return false;
+    const style = window.getComputedStyle(img);
+    if (style.visibility === 'hidden' || style.display === 'none') return false;
+    return true;
+  }
+
+  // --- Hover wiring (delegated) ---
+
+  document.addEventListener('mouseover', (event) => {
+    const target = event.target;
+
+    // Moving onto the overlay itself: keep it visible.
+    if (target === host) return;
+
+    clearTimeout(STATE.hoverTimer);
+
+    if (target instanceof HTMLImageElement && isEligible(target)) {
+      STATE.hoverTimer = setTimeout(() => {
+        if (STATE.searching) return;
+        STATE.currentImg = target;
+        setButtonLabel('Search on CGTrader');
+        button.classList.remove('error');
+        showOverlayFor(target);
+      }, HOVER_DELAY_MS);
+    } else if (!STATE.searching) {
+      hideOverlay();
+    }
+  }, true);
+
+  window.addEventListener('scroll', hideOverlay, true);
+  window.addEventListener('resize', hideOverlay);
+
+  // --- Search ---
+
+  button.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (STATE.searching || !STATE.currentImg) return;
+
+    const imageUrl = imageUrlOf(STATE.currentImg);
+    STATE.searching = true;
+    setButtonLabel('<span class="spinner"></span>Searching\u2026');
+
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'cgtrader-search',
@@ -88,51 +135,28 @@
       if (!response || !response.ok) {
         throw new Error(response && response.error ? response.error : 'No response');
       }
+      STATE.searching = false;
+      hideOverlay();
     } catch (error) {
       console.error(`${LOG_PREFIX} search failed:`, error);
-      showError(button, 'Something went wrong \u2014 try again.');
-    } finally {
-      setLoading(button, false);
+      STATE.searching = false;
+      button.classList.add('error');
+      setButtonLabel('Something went wrong');
+      setTimeout(() => {
+        button.classList.remove('error');
+        setButtonLabel('Search on CGTrader');
+        hideOverlay();
+      }, ERROR_REVERT_MS);
     }
+  });
+
+  function attach() {
+    (document.body || document.documentElement).appendChild(host);
   }
 
-  function createButton(floating) {
-    const button = document.createElement('button');
-    button.id = BUTTON_ID;
-    button.type = 'button';
-    button.className = 'cgt-ext-button' + (floating ? ' cgt-ext-button--floating' : '');
-    button.textContent = 'Search on CGTrader';
-    button.addEventListener('click', handleClick);
-    return button;
+  if (document.body) {
+    attach();
+  } else {
+    document.addEventListener('DOMContentLoaded', attach, { once: true });
   }
-
-  function injectButton() {
-    if (document.getElementById(BUTTON_ID)) return true;
-    const anchor = findAddToCartButton();
-    if (!anchor) return false;
-    anchor.insertAdjacentElement('afterend', createButton(false));
-    return true;
-  }
-
-  function injectFloatingFallback() {
-    if (document.getElementById(BUTTON_ID)) return;
-    document.body.appendChild(createButton(true));
-    console.warn(`${LOG_PREFIX} buy box not found, using floating button`);
-  }
-
-  function start() {
-    if (injectButton()) return;
-
-    const observer = new MutationObserver(() => {
-      if (injectButton()) observer.disconnect();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    setTimeout(() => {
-      observer.disconnect();
-      injectFloatingFallback();
-    }, FALLBACK_TIMEOUT_MS);
-  }
-
-  start();
 })();
