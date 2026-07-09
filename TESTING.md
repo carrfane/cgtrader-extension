@@ -1,27 +1,42 @@
 # Manual Testing Checklist
 
 Load the extension: `chrome://extensions` → enable Developer mode →
-"Load unpacked" → select this folder.
+"Load unpacked" → select this folder. If updating, click the reload icon.
 
-1. Open https://www.turbosquid.com/3d-models/3d-male-body-anatomy-skin-1467539
-   - [ ] "Search on CGTrader" button appears below "Add to Cart".
-2. Click the button.
-   - [ ] Button shows a spinner ("Searching…") and is disabled.
+## Hover overlay
+
+1. Open any page with large images (e.g. https://en.wikipedia.org/wiki/Porsche_911_GT3).
+   - [ ] Hovering a large image (≥120px) shows a green "Search on CGTrader"
+         button in the image's top-right corner after a short delay.
+   - [ ] Hovering small images/icons/logos shows nothing.
+2. Click the "Search on CGTrader" button.
+   - [ ] Button shows a spinner ("Searching…").
    - [ ] A new tab opens on https://www.cgtrader.com/3d-models?image_id=<id>
-         showing visually similar models.
-   - [ ] Original TurboSquid tab stays open; button returns to normal.
-3. Repeat on 2-3 other product pages from different categories.
-   - [ ] Button appears and search works on each.
-3b. Open a localized product URL, e.g.
-    https://www.turbosquid.com/es/3d-models/2023-porsche-911-gt3-rs-yellow-2087437
-   - [ ] Button appears below the translated buy button ("Añadir a la Cesta")
-         and search works.
-4. Flip the image carousel to a different preview, then click the button.
-   - [ ] The search uses the currently displayed image (results reflect it).
-5. Disconnect network (or block cgtrader.com via DevTools), click the button.
-   - [ ] Inline error "Something went wrong — try again." appears and fades.
-   - [ ] Button recovers to a clickable state.
-6. Open a non-product TurboSquid page (e.g. https://www.turbosquid.com/Search/3D-Models/free).
-   - [ ] No button is injected (content script only matches /3d-models/*).
-7. While logged in to cgtrader.com, repeat step 2.
-   - [ ] Works the same (session reused).
+         with visually similar models.
+   - [ ] The original page stays open; if the image was a link, clicking the
+         button did NOT navigate.
+3. Try several different sites (a news site, a shop, an image gallery).
+   - [ ] The overlay appears and search works across sites.
+4. Try a TurboSquid product page (both work the same as any other site):
+   - https://www.turbosquid.com/3d-models/2023-porsche-911-gt3-rs-yellow-2087437
+   - https://www.turbosquid.com/es/3d-models/2023-porsche-911-gt3-rs-yellow-2087437
+   - [ ] Hovering the preview image shows the button and search works.
+
+## Right-click context menu
+
+5. Right-click any image on any page.
+   - [ ] A "Search image on CGTrader" menu item appears.
+   - [ ] Clicking it opens a new tab with CGTrader results for that image.
+6. Right-click an image inside an embedded iframe (e.g. an embedded image widget).
+   - [ ] The context menu item still works (this is where the menu beats the
+         hover overlay).
+
+## Error handling
+
+7. In DevTools → Network, block `www.cgtrader.com`, then click the hover button.
+   - [ ] The button briefly turns red with "Something went wrong", then reverts.
+
+## Session reuse
+
+8. While logged in to cgtrader.com, repeat step 2.
+   - [ ] Works the same (your session is reused automatically).

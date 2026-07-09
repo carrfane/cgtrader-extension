@@ -1,21 +1,17 @@
-# CGTrader Visual Search for TurboSquid
+# CGTrader Visual Search
 
-A Chrome extension that adds a **"Search on CGTrader"** button to TurboSquid product pages. Clicking it uploads the product's preview image to CGTrader's visual similarity search and opens the results in a new tab — so you can quickly find comparable 3D models on CGTrader without leaving TurboSquid.
+A Chrome extension that lets you search for visually similar 3D models on CGTrader from **any image on the web**.
 
-Works on both root and localized TurboSquid URLs:
-- `https://www.turbosquid.com/3d-models/<slug>`
-- `https://www.turbosquid.com/es/3d-models/<slug>` (and any other locale prefix)
+- **Hover** any reasonably large image → a green **"Search on CGTrader"** button appears in its corner.
+- Or **right-click** any image → **"Search image on CGTrader"**.
+
+Either way, the image is sent to CGTrader's visual similarity search and the results open in a new tab. Works anonymously; if you're logged in to CGTrader, your session is reused automatically.
 
 ---
 
-## How it looks
+## Why
 
-The button is injected directly below the "Add to Cart" button in the buy box:
-
-```
-[ Add to Cart         ]
-[ Search on CGTrader  ]   ← injected by this extension
-```
+A general, site-agnostic way to find comparable models on CGTrader starting from any reference image you come across online — a product photo, a render, a screenshot on a blog, etc.
 
 ---
 
@@ -36,42 +32,30 @@ cd cgtrader-extension
 ### 2. Load the extension in Chrome
 
 1. Open Chrome and go to `chrome://extensions`
-2. Enable **Developer mode** (toggle in the top-right corner)
+2. Enable **Developer mode** (toggle, top-right)
 3. Click **Load unpacked**
 4. Select the cloned `cgtrader-extension` folder
 
-The extension icon should appear in your toolbar.
+The extension icon appears in your toolbar.
 
-### 3. Run through the test checklist
+> **Permissions note:** the extension requests access to all sites so it can
+> read image URLs and download images from any CDN. Chrome will show a
+> "Read and change all your data on all websites" warning on install — this
+> is expected for a general image-search tool.
 
-Open a TurboSquid product page and verify each item:
+### 3. Try it
 
-**Basic flow**
-- [ ] Open https://www.turbosquid.com/3d-models/3d-male-body-anatomy-skin-1467539
-- [ ] "Search on CGTrader" button appears below "Add to Cart"
-- [ ] Click the button — it shows a spinner ("Searching…") and disables itself
-- [ ] A new tab opens on `https://www.cgtrader.com/3d-models?image_id=<id>` showing visually similar models
-- [ ] The original TurboSquid tab stays open; the button returns to its normal state
+- **Hover** a large image on any page (e.g. https://en.wikipedia.org/wiki/Porsche_911_GT3)
+  and click the **Search on CGTrader** button.
+- Or **right-click** any image and choose **Search image on CGTrader**.
 
-**Localized URLs**
-- [ ] Open https://www.turbosquid.com/es/3d-models/2023-porsche-911-gt3-rs-yellow-2087437
-- [ ] The button appears below the translated buy button ("Añadir a la Cesta") and the search works
+A new tab opens with visually similar CGTrader models.
 
-**Carousel image**
-- [ ] Flip the image carousel to a different preview, then click the button
-- [ ] The results on CGTrader reflect the image you had selected (not always the first one)
-
-**Error handling**
-- [ ] In Chrome DevTools → Network tab, block `www.cgtrader.com`, then click the button
-- [ ] An inline error "Something went wrong — try again." appears for a few seconds and the button recovers
-
-**No injection on non-product pages**
-- [ ] Open https://www.turbosquid.com/Search/3D-Models/free
-- [ ] No button is injected
+Full verification steps are in [`TESTING.md`](./TESTING.md).
 
 ### 4. Reloading after a code change
 
-If you pull new changes, go back to `chrome://extensions`, find the extension, and click the **reload icon** (circular arrow). You do not need to re-add it.
+Go to `chrome://extensions` and click the **reload icon** on the extension card. No need to re-add it.
 
 ---
 
@@ -79,16 +63,29 @@ If you pull new changes, go back to `chrome://extensions`, find the extension, a
 
 | File | Responsibility |
 |---|---|
-| `manifest.json` | MV3 manifest — URL matching, permissions |
-| `content.js` | Injects the button into the TurboSquid buy box |
-| `content.css` | Button styles (scoped with `cgt-ext-` prefix) |
-| `background.js` | Service worker — fetches CSRF token, downloads the image, POSTs to CGTrader, opens the results tab |
+| `manifest.json` | MV3 manifest — runs on all sites, `tabs` + `contextMenus` permissions |
+| `content.js` | Delegated hover listener + a Shadow-DOM overlay button on large images |
+| `background.js` | Service worker — context menu, CSRF token, image download, upload, opens the results tab |
 
 **Search flow:**
-1. Content script picks the largest visible product image from `p.turbosquid.com` (falls back to `og:image`)
+1. Content script (hover) or context menu picks an image URL
 2. Background worker fetches `cgtrader.com` to get a CSRF token + session cookie
-3. Image is uploaded to `POST /api/internal/users/upload_search_image` — works anonymously; if you're logged into CGTrader your session is reused automatically
+3. Image is uploaded to `POST /api/internal/users/upload_search_image`
 4. CGTrader returns `{ imageId }` → results tab opens at `/3d-models?image_id=<imageId>`
+
+The hover overlay lives in a **closed Shadow DOM** so page styles can't affect it, uses a single delegated `mouseover` listener (cheap on image-heavy pages), and ignores images smaller than 120px. Clicking never triggers link navigation.
+
+---
+
+## Building a distributable zip
+
+The zip is not committed. Regenerate it any time with:
+
+```bash
+zip -r cgtrader-extension.zip manifest.json background.js content.js icons
+```
+
+Use the zip for Chrome Web Store submission, or just **Load unpacked** the folder for local testing.
 
 ---
 
@@ -96,5 +93,5 @@ If you pull new changes, go back to `chrome://extensions`, find the extension, a
 
 1. Make your changes
 2. Reload the extension at `chrome://extensions`
-3. Run through the checklist in step 3 above (or the full `TESTING.md`)
+3. Run through [`TESTING.md`](./TESTING.md)
 4. Open a PR
